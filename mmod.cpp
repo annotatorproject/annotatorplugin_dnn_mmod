@@ -137,7 +137,7 @@ void MMOD::trainWorker() {
   widget.setProgress(10);
   getImagesTrain();
   widget.setProgress(20);
-  dlib::mmod_options options(boxes_train, 40 * 40);
+  dlib::mmod_options options(boxes_train, 20 * 20, 10 * 10);//
   net = net_type(options);
   dlib::dnn_trainer<net_type> trainer(net);
   trainer.set_learning_rate(0.1);
@@ -147,21 +147,27 @@ void MMOD::trainWorker() {
   widget.setProgress(30);
   std::vector<dlib::matrix<dlib::rgb_pixel>> mini_batch_samples;
   std::vector<std::vector<dlib::mmod_rect>> mini_batch_labels;
+
   dlib::random_cropper cropper;
   cropper.set_chip_dims(200, 200);
-  cropper.set_min_object_height(0.2);
+  cropper.set_min_object_size(0.2);
   dlib::rand rnd;
   // Run the trainer until the learning rate gets small.  This will probably
   // take several
   // hours.
   while (!stopTraining && trainer.get_learning_rate() >= 1e-4) {
-    cropper(150, images_train, boxes_train, mini_batch_samples,
-            mini_batch_labels);
-    // We can also randomly jitter the colors and that often helps a detector
-    // generalize better to new images.
-    for (auto &&img : mini_batch_samples) disturb_colors(img, rnd);
+    try {
+      cropper(50, images_train, boxes_train, mini_batch_samples,
+              mini_batch_labels);
+      // We can also randomly jitter the colors and that often helps a detector
+      // generalize better to new images.
+      for (auto &&img : mini_batch_samples) disturb_colors(img, rnd);
 
-    trainer.train_one_step(mini_batch_samples, mini_batch_labels);
+      trainer.train_one_step(mini_batch_samples, mini_batch_labels);
+    } catch (dlib::impossible_labeling_error &e) {
+      std::cout << this->getName().toStdString() << ": " << e.what()
+                << std::endl;
+    }
   }
   // wait for training threads to stop
   trainer.get_net();
